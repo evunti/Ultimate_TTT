@@ -32,6 +32,9 @@ export function GameBoard({
         <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-800 mb-2 tracking-tight drop-shadow-md">
           Ultimate Tic Tac Toe
         </h1>
+        <h2 className="text-xl font-semibold text-slate-700 mb-2 text-center">
+          You're playing Ultimate Tic Tac Toe locally!
+        </h2>
         <div className="bg-white/90 rounded-3xl shadow-2xl border border-slate-200 p-4 sm:p-8 w-full">
           <div className="grid grid-cols-3 gap-4 sm:gap-6 aspect-square">
             {game.boards.map((board: string[], boardIndex: number) => (
