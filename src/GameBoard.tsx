@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Id } from "../convex/_generated/dataModel";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState } from "./store";
+import { makeMove as makeLocalMove, resetGame } from "./gameSlice";
 
 function getOrCreatePlayerId(gameId: string) {
   const key = `ttt-playerId-${gameId}`;
@@ -13,11 +16,117 @@ function getOrCreatePlayerId(gameId: string) {
   return id;
 }
 
-export function GameBoard({ gameId }: { gameId: Id<"games"> }) {
-  const game = useQuery(api.games.getGame, { gameId });
+export function GameBoard({
+  local,
+  ...props
+}: {
+  local?: boolean;
+  gameId?: any;
+}) {
+  if (local) {
+    // Redux local play version
+    const game = useSelector((state: RootState) => state.game);
+    const dispatch = useDispatch();
+    return (
+      <div className="flex flex-col items-center gap-8 w-full max-w-2xl mx-auto py-8">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-800 mb-2 tracking-tight drop-shadow-md">
+          Ultimate Tic Tac Toe
+        </h1>
+        <div className="bg-white/90 rounded-3xl shadow-2xl border border-slate-200 p-4 sm:p-8 w-full">
+          <div className="grid grid-cols-3 gap-4 sm:gap-6 aspect-square">
+            {game.boards.map((board: string[], boardIndex: number) => (
+              <div
+                key={boardIndex}
+                className={`relative aspect-square rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-200
+                  ${game.activeBoard === -1 || game.activeBoard === boardIndex ? "bg-white border-blue-400 shadow-lg scale-105" : "bg-slate-100 border-slate-200 opacity-60"}
+                `}
+                style={{ minWidth: 0 }}
+              >
+                {/* Winner overlay */}
+                {game.innerWinners[boardIndex] && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-100/90 rounded-2xl z-10">
+                    <span
+                      className={`font-extrabold text-6xl sm:text-7xl ${game.innerWinners[boardIndex] === "X" ? "text-blue-600" : "text-pink-500"}`}
+                    >
+                      {game.innerWinners[boardIndex]}
+                    </span>
+                  </div>
+                )}
+                {/* Mini board grid */}
+                <div className="relative w-full h-full grid grid-cols-3 grid-rows-3 gap-1 sm:gap-2 z-0">
+                  {board.map((cell: string, position: number) => (
+                    <button
+                      key={position}
+                      className={`w-full h-full aspect-square flex items-center justify-center text-3xl sm:text-4xl font-extrabold rounded-lg border border-slate-200 transition-colors duration-150
+                        ${cell === "X" ? "text-blue-600" : cell === "O" ? "text-pink-500" : "hover:bg-blue-50 active:bg-blue-100"}
+                        ${game.activeBoard === -1 || game.activeBoard === boardIndex ? "" : "cursor-not-allowed"}
+                      `}
+                      onClick={() =>
+                        dispatch(makeLocalMove({ boardIndex, position }))
+                      }
+                      disabled={
+                        cell !== "" ||
+                        (game.activeBoard !== -1 &&
+                          game.activeBoard !== boardIndex) ||
+                        game.status !== "playing"
+                      }
+                    >
+                      {cell}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="text-center space-y-3 mt-4">
+          {game.status === "playing" ? (
+            <p className="text-lg font-semibold text-slate-700">
+              <span className="mr-2">Current turn:</span>
+              <span
+                className={
+                  game.currentTurn === "X"
+                    ? "text-blue-600 font-bold"
+                    : "text-pink-500 font-bold"
+                }
+              >
+                {game.currentTurn}
+              </span>
+              <span className="ml-2">
+                {game.activeBoard === -1
+                  ? "You can play in any board."
+                  : `Play in board ${game.activeBoard + 1}.`}
+              </span>
+            </p>
+          ) : game.status === "won" ? (
+            <p className="text-2xl font-bold text-green-600 drop-shadow-sm">
+              Winner: {game.currentTurn === "X" ? "O" : "X"}
+            </p>
+          ) : (
+            <p className="text-2xl font-bold text-slate-500 drop-shadow-sm">
+              Draw!
+            </p>
+          )}
+          <button
+            className="mt-3 px-8 py-2 bg-gradient-to-r from-blue-500 to-pink-500 text-white rounded-xl shadow hover:from-blue-600 hover:to-pink-600 transition-colors text-lg font-bold tracking-wide"
+            onClick={() => dispatch(resetGame())}
+          >
+            Reset Game
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Only allow online mode if gameId is provided
+  if (!props.gameId) {
+    return <div className="text-center text-red-600">No game ID provided.</div>;
+  }
+
+  const game = useQuery(api.games.getGame, { gameId: props.gameId });
   const makeMove = useMutation(api.games.makeMove);
   const [playerRole, setPlayerRole] = useState<"X" | "O" | null>(null);
-  const [playerId] = useState(() => getOrCreatePlayerId(gameId));
+  const [playerId] = useState(() => getOrCreatePlayerId(props.gameId));
 
   // Assign player automatically
   useEffect(() => {
@@ -60,10 +169,10 @@ export function GameBoard({ gameId }: { gameId: Id<"games"> }) {
   const joinGame = useMutation(api.games.joinGame);
   useEffect(() => {
     if (canJoin && playerRole) {
-      joinGame({ gameId, player: playerRole, playerId });
+      joinGame({ gameId: props.gameId, player: playerRole, playerId });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canJoin, playerRole, playerId, gameId]);
+  }, [canJoin, playerRole, playerId, props.gameId]);
 
   return (
     <div className="space-y-4">
@@ -78,7 +187,7 @@ export function GameBoard({ gameId }: { gameId: Id<"games"> }) {
           )}
         </div>
         <div className="grid grid-cols-3 gap-2 aspect-square">
-          {(game.boards ?? []).map((board, boardIndex) => (
+          {(game.boards ?? []).map((board: string[], boardIndex: number) => (
             <div key={boardIndex} className="relative">
               <div className="absolute top-1 left-1 text-xs text-gray-500">
                 {boardIndex + 1}
@@ -89,7 +198,7 @@ export function GameBoard({ gameId }: { gameId: Id<"games"> }) {
                 </div>
               )}
               <div className="grid grid-cols-3 gap-[2px] bg-gray-200 p-[2px]">
-                {board.map((cell, position) => (
+                {board.map((cell: string, position: number) => (
                   <button
                     key={position}
                     className={`
@@ -108,7 +217,7 @@ export function GameBoard({ gameId }: { gameId: Id<"games"> }) {
                     }
                     onClick={() =>
                       makeMove({
-                        gameId,
+                        gameId: props.gameId,
                         boardIndex,
                         position,
                         player: playerRole!,
