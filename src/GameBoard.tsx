@@ -24,9 +24,15 @@ export function GameBoard({
   local?: boolean;
   gameId?: any;
 }) {
-  const params = useParams();
-  const gameIdString = local ? undefined : params.gameId;
+  // Only use useParams if local is false
+  let params: ReturnType<typeof useParams> | undefined = undefined;
+  let gameIdString: string | undefined = undefined;
+  if (!local) {
+    params = useParams();
+    gameIdString = params.gameId;
+  }
   const gameId = local || !gameIdString ? undefined : (gameIdString as Id<"games">);
+  const [copied, setCopied] = useState(false);
 
   if (local) {
     // Redux local play version
@@ -182,6 +188,9 @@ export function GameBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canJoin, playerRole, playerId, gameId]);
 
+  // Share link for online games
+  const shareUrl = `${window.location.origin}/game/${gameIdString}`;
+
   return (
     <div className="space-y-4">
       <div className="bg-white p-4 rounded-lg shadow-sm border">
@@ -194,6 +203,35 @@ export function GameBoard({
             <span>You are spectating</span>
           )}
         </div>
+        {/* Share link and waiting message for online games */}
+        {!local && (
+          <div className="mb-4 flex flex-col items-center">
+            <div className="flex items-center gap-2 w-full max-w-xs">
+              <input
+                className="border rounded px-2 py-1 w-full"
+                value={shareUrl}
+                readOnly
+                onFocus={(e) => e.target.select()}
+              />
+              <button
+                className={`px-2 py-1 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 transition ${copied ? "scale-110" : ""}`}
+                onClick={() => {
+                  navigator.clipboard.writeText(shareUrl);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 300);
+                }}
+              >
+                Copy
+              </button>
+            </div>
+            {game.status === "waiting" && (
+              <div className="mt-2 text-blue-700 text-sm text-center">
+                Waiting for another player to join...
+              </div>
+            )}
+          </div>
+        )}
+        {/* Game board UI */}
         <div className="grid grid-cols-3 gap-2 aspect-square">
           {(game.boards ?? []).map((board: string[], boardIndex: number) => (
             <div key={boardIndex} className="relative">
@@ -239,7 +277,7 @@ export function GameBoard({
             </div>
           ))}
         </div>
-
+        {/* Status and turn info */}
         <div className="mt-4 text-center text-sm">
           {game.status === "waiting" && (
             <p className="text-yellow-600">
