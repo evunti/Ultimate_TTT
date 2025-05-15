@@ -5,6 +5,7 @@ import { Id } from "../convex/_generated/dataModel";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "./store";
 import { makeMove as makeLocalMove, resetGame } from "./gameSlice";
+import { useParams } from "react-router-dom";
 
 function getOrCreatePlayerId(gameId: string) {
   const key = `ttt-playerId-${gameId}`;
@@ -23,6 +24,10 @@ export function GameBoard({
   local?: boolean;
   gameId?: any;
 }) {
+  const params = useParams();
+  const gameIdString = local ? undefined : params.gameId;
+  const gameId = local || !gameIdString ? undefined : (gameIdString as Id<"games">);
+
   if (local) {
     // Redux local play version
     const game = useSelector((state: RootState) => state.game);
@@ -122,14 +127,14 @@ export function GameBoard({
   }
 
   // Only allow online mode if gameId is provided
-  if (!props.gameId) {
+  if (!gameId) {
     return <div className="text-center text-red-600">No game ID provided.</div>;
   }
 
-  const game = useQuery(api.games.getGame, { gameId: props.gameId });
+  const game = useQuery(api.games.getGame, { gameId });
   const makeMove = useMutation(api.games.makeMove);
   const [playerRole, setPlayerRole] = useState<"X" | "O" | null>(null);
-  const [playerId] = useState(() => getOrCreatePlayerId(props.gameId));
+  const [playerId] = useState(() => getOrCreatePlayerId(gameId));
 
   // Assign player automatically
   useEffect(() => {
@@ -172,10 +177,10 @@ export function GameBoard({
   const joinGame = useMutation(api.games.joinGame);
   useEffect(() => {
     if (canJoin && playerRole) {
-      joinGame({ gameId: props.gameId, player: playerRole, playerId });
+      joinGame({ gameId, player: playerRole, playerId });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canJoin, playerRole, playerId, props.gameId]);
+  }, [canJoin, playerRole, playerId, gameId]);
 
   return (
     <div className="space-y-4">
@@ -220,7 +225,7 @@ export function GameBoard({
                     }
                     onClick={() =>
                       makeMove({
-                        gameId: props.gameId,
+                        gameId,
                         boardIndex,
                         position,
                         player: playerRole!,
